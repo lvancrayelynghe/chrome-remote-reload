@@ -1,0 +1,11 @@
+language: go
+go:
+  - 1.7
+env:
+  - "PATH=/home/travis/gopath/bin:$PATH"
+before_install:
+  - go get github.com/jawher/mow.cli
+  - go get golang.org/x/net/websocket
+script:
+  - gox -output "dist/{{.OS}}_{{.Arch}}_{{.Dir}}"
+  - ghr --username $GITHUB_USER --token $GITHUB_TOKEN --replace --prerelease --debug pre-release dist/
