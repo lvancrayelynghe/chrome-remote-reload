@@ -4,6 +4,8 @@ go:
 env:
   - "PATH=/home/travis/gopath/bin:$PATH"
 before_install:
+  - go get github.com/mitchellh/gox
+  - go get github.com/tcnksm/ghr
   - go get github.com/jawher/mow.cli
   - go get golang.org/x/net/websocket
 script:
