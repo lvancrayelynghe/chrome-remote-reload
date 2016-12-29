@@ -10,6 +10,10 @@ import (
 	"os"
 )
 
+type Tab struct {
+	Description, DevtoolsFrontendUrl, FaviconUrl, Id, Title, Type, Url, WebSocketDebuggerUrl string
+}
+
 func main() {
 	app := cli.App("chrome-remote-reload", "Chrome Remote Debugging Page Reload tool\n\nFirst, run Chrome remote debugger with: chrome --remote-debugging-port=9222\n")
 	app.Spec = "[-h=<host>] [-p=<port>]"
@@ -22,36 +26,49 @@ func main() {
 	app.Action = func() {
 		log.Printf("Init listing ...")
 
-		wsUrl := getWebSocketDebuggerUrl(*host, *port)
-		log.Printf("Connect on WS ... %s", wsUrl)
+		tab := getFirstTab(*host, *port)
+		log.Printf("Connect on WS ... %s", tab.WebSocketDebuggerUrl)
 
-		response := refreshTab(*host, wsUrl)
+		response := refreshTab(*host, tab)
 		log.Printf("Response ... %s", response)
+
+		os.Exit(0)
 	}
 
 	app.Run(os.Args)
 }
 
-func refreshTab(host string, tabWsUrl string) string {
-	origin := "http://" + host + "/"
-	ws, err := websocket.Dial(tabWsUrl, "", origin)
+func refreshTab(host string, tab Tab) string {
+	var msg = make([]byte, 1024)
+	var origin = "http://" + host + "/"
+
+	ws, err := websocket.Dial(tab.WebSocketDebuggerUrl, "", origin)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if _, err := ws.Write([]byte("{\"id\": 0, \"method\": \"Page.reload\"}")); err != nil {
+	var cmd = ""
+	if tab.Type == "page" {
+		cmd = "{\"id\": 0, \"method\": \"Page.reload\"}"
+	} else {
+		cmd = "{\"id\": 0, \"method\": \"Runtime.evaluate\", \"params\": {\"expression\": \"WebInspector.Main._reloadPage(true)\"}}"
+	}
+
+	if _, err := ws.Write([]byte(cmd)); err != nil {
 		log.Fatal(err)
 	}
 
-	var msg = make([]byte, 512)
-	if _, err := ws.Read(msg); err != nil {
+	n, err := ws.Read(msg)
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	return string(msg[:])
+	return string(msg[:n])
 }
 
-func getWebSocketDebuggerUrl(host string, port string) string {
+func getFirstTab(host string, port string) Tab {
+	var tabs []Tab
+
 	res, err := http.Get("http://" + host + ":" + port + "/json")
 	if err != nil {
 		log.Fatal(err)
@@ -63,17 +80,14 @@ func getWebSocketDebuggerUrl(host string, port string) string {
 		log.Fatal(err)
 	}
 
-	type Tab struct {
-		Description, DevtoolsFrontendUrl, FaviconUrl, Id, Title, Type, Url, WebSocketDebuggerUrl string
-	}
-	var tabs []Tab
-
 	err = json.Unmarshal(jsonBytes, &tabs)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	firstTab := tabs[0]
+	if len(tabs) <= 0 {
+		log.Fatal("No tab found")
+	}
 
-	return firstTab.WebSocketDebuggerUrl
+	return tabs[0]
 }
