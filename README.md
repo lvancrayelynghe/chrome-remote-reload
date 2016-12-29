@@ -1,5 +1,7 @@
 # Chrome Remote Debugging Page Reload
 
+Simple tool to reload a Chrome tab from command line, using Chrome's remote debugging protocol
+
 ## Usage
 
 ```
